@@ -1,4 +1,6 @@
 """Test transport."""
+from __future__ import annotations
+
 import asyncio
 import platform
 import time
@@ -20,12 +22,12 @@ FACTOR = 1.2 if platform.system().lower() != "windows" else 4.2
 class TestTransportComm:
     """Test for the transport module."""
 
-    @staticmethod
+    @classmethod
     @pytest.fixture(name="use_port")
-    def get_port_in_class(base_ports):
+    def get_port_in_class(cls, base_ports):
         """Return next port."""
-        base_ports[__class__.__name__] += 1
-        return base_ports[__class__.__name__]
+        base_ports[cls.__class__.__name__] += 1
+        return base_ports[cls.__class__.__name__]
 
     @pytest.mark.parametrize(
         ("use_comm_type", "use_host"),
@@ -213,10 +215,22 @@ class TestTransportComm:
         assert len(server.active_connections) == 1
         server_connected = list(server.active_connections.values())[0]
 
-        client2 = ModbusProtocol(client.comm_params, False)
-        client2.callback_connected = mock.Mock()
-        client2.callback_disconnected = mock.Mock()
-        client2.callback_data = mock.Mock(return_value=0)
+        class Client2ModbusProtocol(ModbusProtocol):
+            """Test ModbusProtocol."""
+
+            def callback_new_connection(self) -> ModbusProtocol:
+                return self
+
+            def callback_connected(self) -> None:
+                pass
+
+            def callback_disconnected(self, exc: Exception | None) -> None:
+                pass
+
+            def callback_data(self, data: bytes, addr: tuple | None = None) -> int:
+                return 0
+
+        client2 = Client2ModbusProtocol(client.comm_params, False)
         assert await client2.connect()
         await asyncio.sleep(0.5)
         assert len(server.active_connections) == 2
